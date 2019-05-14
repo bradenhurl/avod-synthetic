@@ -73,18 +73,29 @@ class BevSlices(bev_generator.BevGenerator):
             # Apply slice filter
             slice_points = all_points[slice_filter]
 
-            if len(slice_points) > 1:
+            # ***This fixes bug where if there's no points in a slice script will crash
+            # Add a point if there aren't any valid ones
+            # This shouldn't change detections significantly
+            # TODO This is not the best option, would be better to allow 0 voxels with pts
+            if len(slice_points) == 0:
+                ground_plane = np.array(ground_plane)
+                offset_dist = (height_lo + height_hi) / 2
+                offset_plane = ground_plane + [0, 0, 0, -offset_dist]
+                new_pt = np.array([area_extents[0,1], 0, area_extents[2,1], 1])
+                new_pt_height = np.dot(offset_plane, new_pt.T)
+                new_pt[1] = new_pt_height
+                slice_points = np.array([new_pt[0:3]])
 
-                # Create Voxel Grid 2D
-                voxel_grid_2d = VoxelGrid2D()
-                voxel_grid_2d.voxelize_2d(
-                    slice_points, voxel_size,
-                    extents=area_extents,
-                    ground_plane=ground_plane,
-                    create_leaf_layout=False)
+            # Create Voxel Grid 2D
+            voxel_grid_2d = VoxelGrid2D()
+            voxel_grid_2d.voxelize_2d(
+                slice_points, voxel_size,
+                extents=area_extents,
+                ground_plane=ground_plane,
+                create_leaf_layout=False)
 
-                # Remove y values (all 0)
-                voxel_indices = voxel_grid_2d.voxel_indices[:, [0, 2]]
+            # Remove y values (all 0)
+            voxel_indices = voxel_grid_2d.voxel_indices[:, [0, 2]]
 
             # Create empty BEV images
             height_map = np.zeros((voxel_grid_2d.num_divisions[0],
