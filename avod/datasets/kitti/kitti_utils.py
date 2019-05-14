@@ -299,7 +299,10 @@ class KittiUtils(object):
     def filter_labels(self, objects,
                       classes=None,
                       difficulty=None,
-                      max_occlusion=None):
+                      max_occlusion=None,
+                      max_forward=None,
+                      max_side=None,
+                      in_frustrum=False):
         """Filters ground truth labels based on class, difficulty, and
         maximum occlusion
 
@@ -315,6 +318,9 @@ class KittiUtils(object):
         """
         if classes is None:
             classes = self.dataset.classes
+
+        if objects is None:
+            return objects
 
         objects = np.asanyarray(objects)
         filter_mask = np.ones(len(objects), dtype=np.bool)
@@ -335,6 +341,11 @@ class KittiUtils(object):
 
             if max_occlusion and \
                     obj.occlusion > max_occlusion:
+                filter_mask[obj_idx] = False
+                continue
+
+            if max_forward is not None and \
+                    not self._check_distance(obj, max_forward, max_side, in_frustrum):
                 filter_mask[obj_idx] = False
                 continue
 
@@ -361,3 +372,24 @@ class KittiUtils(object):
             matches the desired class.
         """
         return obj.type in classes
+
+    def _check_distance(self, obj, max_forward, max_side, in_frustrum):
+        """This filters an object by class.
+        Args:
+            obj: An instance of ground-truth Object Label
+        Returns: True or False depending on whether the object
+            is less than 80m away. Only checks the distance for
+            pedestrians.
+        """
+
+        if in_frustrum:
+            if abs(obj.t[0]) > obj.t[2]:
+                return False
+
+        # Max forward distance
+        if obj.t[2] > max_forward:
+            return False
+        if abs(obj.t[0]) > max_side:
+            return False
+
+        return True
